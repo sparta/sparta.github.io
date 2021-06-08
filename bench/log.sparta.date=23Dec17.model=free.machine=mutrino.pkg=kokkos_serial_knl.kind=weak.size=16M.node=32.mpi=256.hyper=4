@@ -1,0 +1,181 @@
+SPARTA (23 Dec 2017)
+KOKKOS mode is enabled (../kokkos.cpp:39)
+  using 0 GPU(s) per MPI task
+  using 1 thread(s) per MPI task
+package kokkos
+package kokkos reduction parallel/reduce comm classic
+# advect particles via free molecular flow on a uniform grid
+# particles reflect off global box boundaries
+
+variable            x index 10
+variable            y index 10
+variable            z index 10
+
+variable            lx equal $x*1.0e-5
+variable            lx equal 512*1.0e-5
+variable            ly equal $y*1.0e-5
+variable            ly equal 320*1.0e-5
+variable            lz equal $z*1.0e-5
+variable            lz equal 320*1.0e-5
+
+variable            n equal 10*$x*$y*$z
+variable            n equal 10*512*$y*$z
+variable            n equal 10*512*320*$z
+variable            n equal 10*512*320*320
+
+seed	    	    12345
+dimension   	    3
+global              gridcut 1.0e-5
+
+boundary	    rr rr rr
+
+create_box  	    0 ${lx} 0 ${ly} 0 ${lz}
+create_box  	    0 0.00512 0 ${ly} 0 ${lz}
+create_box  	    0 0.00512 0 0.0032 0 ${lz}
+create_box  	    0 0.00512 0 0.0032 0 0.0032
+Created orthogonal box = (0 0 0) to (0.00512 0.0032 0.0032)
+create_grid 	    $x $y $z
+create_grid 	    512 $y $z
+create_grid 	    512 320 $z
+create_grid 	    512 320 320
+WARNING: Could not acquire nearby ghost cells b/c grid partition is not clumped (../grid.cpp:381)
+Created 52428800 child grid cells
+  parent cells = 1
+  CPU time = 0.0861349 secs
+  create/ghost percent = 33.6518 66.3482
+
+balance_grid        rcb part
+Balance grid migrated 52416000 cells
+  CPU time = 7.39648 secs
+  reassign/sort/migrate/ghost percent = 83.8059 0.0187377 11.1258 5.0496
+
+species		    ar.species Ar
+mixture		    air Ar vstream 0.0 0.0 0.0 temp 273.15
+
+global              nrho 7.07043E22
+global              fnum 7.07043E6
+
+create_particles    air n $n
+create_particles    air n 524288000
+Created 524288000 particles
+  CPU time = 0.184243 secs
+
+stats		    100
+compute             temp temp
+stats_style	    step cpu np nattempt ncoll c_temp
+
+# equilibrate with large timestep to unsort particles
+# then benchmark with normal timestep
+
+timestep 	    7.00E-8
+run                 30
+Memory usage per proc in Mbytes:
+  particles (ave,min,max) = 7.44173 7.44173 7.44173
+  grid      (ave,min,max) = 2.45081 1.51388 2.45138
+  surf      (ave,min,max) = 0 0 0
+  total     (ave,min,max) = 9.89253 8.9556 9.8931
+Step CPU Np Natt Ncoll c_temp 
+       0            0 524288000        0        0    273.15563 
+      30    5.6873021 524288000        0        0    273.15563 
+Loop time of 5.68822 on 8192 procs for 30 steps with 524288000 particles
+
+Particle moves    = 15728640000 (15.7B)
+Cells touched     = 78624134875 (78.6B)
+Particle comms    = 3064149237 (3.06B)
+Boundary collides = 171880514 (172M)
+Boundary exits    = 0 (0K)
+SurfColl checks   = 0 (0K)
+SurfColl occurs   = 0 (0K)
+Surf reactions    = 0 (0K)
+Collide attempts  = 0 (0K)
+Collide occurs    = 0 (0K)
+Reactions         = 0 (0K)
+Particles stuck   = 0
+
+Particle-moves/CPUsec/proc: 337540
+Particle-moves/step: 5.24288e+08
+Cell-touches/particle/step: 4.99879
+Particle comm iterations/step: 4
+Particle fraction communicated: 0.194813
+Particle fraction colliding with boundary: 0.0109279
+Particle fraction exiting boundary: 0
+Surface-checks/particle/step: 0
+Surface-collisions/particle/step: 0
+Surf-reactions/particle/step: 0
+Collision-attempts/particle/step: 0
+Collisions/particle/step: 0
+Reactions/particle/step: 0
+
+Move  time (%) = 4.45082 (78.2462)
+Coll  time (%) = 0 (0)
+Sort  time (%) = 0 (0)
+Comm  time (%) = 1.23037 (21.6302)
+Modfy time (%) = 0 (0)
+Outpt time (%) = 0.0063688 (0.111965)
+Other time (%) = 0.000660301 (0.0116082)
+
+Particles: 64000 ave 64930 max 63086 min
+Histogram: 22 117 485 1336 2194 2209 1298 440 83 8
+Cells:      6400 ave 6400 max 6400 min
+Histogram: 8192 0 0 0 0 0 0 0 0 0
+GhostCell: 4512.98 ave 5120 max 1538 min
+Histogram: 5 11 53 197 298 892 824 776 1392 3744
+EmptyCell: 1936.17 ave 2808 max 0 min
+Histogram: 27 156 158 482 851 867 1608 837 2079 1127
+timestep 	    7.00E-9
+run 		    $t
+run 		    100
+Memory usage per proc in Mbytes:
+  particles (ave,min,max) = 7.44173 7.44173 7.44173
+  grid      (ave,min,max) = 2.45081 1.51388 2.45138
+  surf      (ave,min,max) = 0 0 0
+  total     (ave,min,max) = 9.89253 8.9556 9.8931
+Step CPU Np Natt Ncoll c_temp 
+      30            0 524288000        0        0    273.15563 
+     100     3.207546 524288000        0        0    273.15563 
+     130    4.5435548 524288000        0        0    273.15563 
+Loop time of 4.54452 on 8192 procs for 100 steps with 524288000 particles
+
+Particle moves    = 52428800000 (52.4B)
+Cells touched     = 73323367615 (73.3B)
+Particle comms    = 1070292641 (1.07B)
+Boundary collides = 57299211 (57.3M)
+Boundary exits    = 0 (0K)
+SurfColl checks   = 0 (0K)
+SurfColl occurs   = 0 (0K)
+Surf reactions    = 0 (0K)
+Collide attempts  = 0 (0K)
+Collide occurs    = 0 (0K)
+Reactions         = 0 (0K)
+Particles stuck   = 0
+
+Particle-moves/CPUsec/proc: 1.40829e+06
+Particle-moves/step: 5.24288e+08
+Cell-touches/particle/step: 1.39853
+Particle comm iterations/step: 1.01
+Particle fraction communicated: 0.0204142
+Particle fraction colliding with boundary: 0.0010929
+Particle fraction exiting boundary: 0
+Surface-checks/particle/step: 0
+Surface-collisions/particle/step: 0
+Surf-reactions/particle/step: 0
+Collision-attempts/particle/step: 0
+Collisions/particle/step: 0
+Reactions/particle/step: 0
+
+Move  time (%) = 3.99938 (88.0045)
+Coll  time (%) = 0 (0)
+Sort  time (%) = 0 (0)
+Comm  time (%) = 0.53083 (11.6807)
+Modfy time (%) = 0 (0)
+Outpt time (%) = 0.0129818 (0.285658)
+Other time (%) = 0.00132777 (0.0292169)
+
+Particles: 64000 ave 65005 max 63134 min
+Histogram: 31 185 684 1727 2323 1969 967 269 33 4
+Cells:      6400 ave 6400 max 6400 min
+Histogram: 8192 0 0 0 0 0 0 0 0 0
+GhostCell: 4512.98 ave 5120 max 1538 min
+Histogram: 5 11 53 197 298 892 824 776 1392 3744
+EmptyCell: 1936.17 ave 2808 max 0 min
+Histogram: 27 156 158 482 851 867 1608 837 2079 1127

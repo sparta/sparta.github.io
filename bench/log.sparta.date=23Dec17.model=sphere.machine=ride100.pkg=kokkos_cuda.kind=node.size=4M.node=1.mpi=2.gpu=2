@@ -1,0 +1,231 @@
+SPARTA (23 Dec 2017)
+KOKKOS mode is enabled (../kokkos.cpp:39)
+  using 2 GPU(s) per MPI task
+  using 1 thread(s) per MPI task
+package kokkos
+package kokkos reduction atomic comm threaded
+# flow around a sphere on a uniform grid
+# particles are created initially and input at boundaries at stream velocity
+
+variable            x index 10
+variable            y index 10
+variable            z index 10
+
+variable            n equal 10*$x*$y*$z
+variable            n equal 10*64*$y*$z
+variable            n equal 10*64*80*$z
+variable            n equal 10*64*80*80
+variable            fnum equal 7.33e+21/v_n
+
+seed	    	    12345
+dimension   	    3
+global              nrho 7.03E18
+global              fnum ${fnum}
+global              fnum 1.78955078125e+15
+timestep 	    1.E-5
+global              gridcut 0.1 particle/reorder 10
+global              surfmax 300
+
+boundary	    o o o
+create_box          -5.0 5.0 -5.0 5.0 -5.0 5.0
+Created orthogonal box = (-5 -5 -5) to (5 5 5)
+create_grid         $x $y $z
+create_grid         64 $y $z
+create_grid         64 80 $z
+create_grid         64 80 80
+WARNING: Could not acquire nearby ghost cells b/c grid partition is not clumped (../grid.cpp:381)
+Created 409600 child grid cells
+  parent cells = 1
+  CPU time = 0.01807 secs
+  create/ghost percent = 81.0571 18.9429
+
+balance_grid        rcb cell
+Balance grid migrated 204800 cells
+  CPU time = 0.152196 secs
+  reassign/sort/migrate/ghost percent = 9.70335 0.53481 15.7567 74.0051
+
+species		    ar.species Ar
+
+mixture             air Ar frac 1.0
+mixture 	    air group species
+mixture             air Ar vstream 2500.0 0.0 0.0 temp 300.00
+
+fix		    in emit/face air all
+
+collide		    vss air ar.vss
+
+read_surf	    data.sphere
+  602 points
+  1200 triangles
+  -1 1 xlo xhi
+  -1 1 ylo yhi
+  -1 1 zlo zhi
+  0.100631 min triangle edge length
+  0.00439601 min triangle area
+  1040 = cells with surfs
+  5896 = total surfs in all grid cells
+  14 = max surfs in one grid cell
+  0.64404 = min surf-size/cell-size ratio
+  0 0 = number of pushed cells
+  1040 0 = cells overlapping surfs, overlap cells with unmarked corner pts
+  407376 1184 1040 = cells outside/inside/overlapping surfs
+  1040 = surf cells with 1,2,etc splits
+  995.862 995.862 = cell-wise and global flow volume
+  CPU time = 0.0971601 secs
+  read/sort/check/surf2grid/ghost/inout/particle percent = 1.44705 5.08246 2.29928 36.4727 54.6986 30.1348 0.000981549
+surf_collide	    1 diffuse 300.0 1.0
+surf_modify         all collide 1
+
+create_particles    air n 0
+Created 3912103 particles
+  CPU time = 0.720516 secs
+
+fix                 3 balance 100 1.1 rcb part
+collide_modify      vremax 100 yes
+
+#compute             1 grid all all nrho mass u v w
+#fix                 1 ave/grid 10 100 1000 c_1 ave running
+#dump                1 grid all 1000 tmp_flow.* id xc yc zc f_1
+
+#compute             2 surf all all press ke
+#fix		    2 ave/surf all 10 100 1000 c_2 ave running
+#dump                2 surf all 1000 tmp_surf.* id f_2
+
+compute             g grid all all n
+compute             max reduce max c_g[1]
+
+stats_style	    step cpu np nattempt ncoll nscoll c_max
+stats		    100
+
+# equilibrate flow for 1000 steps
+# then benchmark for 1000 steps
+
+run 		    1000
+WARNING: One or more fix inflow faces oppose streaming velocity (../fix_emit_face.cpp:195)
+Memory usage per proc in Mbytes:
+  particles (ave,min,max) = 303.926 303.926 303.926
+  grid      (ave,min,max) = 37.104 37.104 37.104
+  surf      (ave,min,max) = 0.0801544 0.0801544 0.0801544
+  total     (ave,min,max) = 342.673 342.673 342.673
+Step CPU Np Natt Ncoll Nscoll c_max 
+       0            0  3912103        0        0        0           11 
+     100   0.69034815  3911418     1365     1175      485           89 
+     200    1.3012512  3920502     1850     1602      454          105 
+     300      1.91804  3954072     1989     1756      482           99 
+     400    2.5371392  3995352     2040     1777      481           99 
+     500    3.1569512  4027214     2073     1802      482           95 
+     600    3.7810671  4044493     2070     1781      496          107 
+     700     4.408855  4051245     2016     1740      488          101 
+     800    5.0376661  4053480     2073     1785      530          106 
+     900    5.6643481  4055218     2053     1796      478          109 
+    1000     6.286658  4057463     2054     1791      511          105 
+Loop time of 6.28671 on 2 procs for 1000 steps with 4057463 particles
+
+Particle moves    = 4010922091 (4.01B)
+Cells touched     = 4773404810 (4.77B)
+Particle comms    = 961720 (0.962M)
+Boundary collides = 0 (0K)
+Boundary exits    = 11245228 (11.2M)
+SurfColl checks   = 110245258 (110M)
+SurfColl occurs   = 471956 (0.472M)
+Surf reactions    = 0 (0K)
+Collide attempts  = 58851223 (58.9M)
+Collide occurs    = 44853619 (44.9M)
+Reactions         = 0 (0K)
+Particles stuck   = 0
+
+Particle-moves/CPUsec/proc: 3.19e+08
+Particle-moves/step: 4.01092e+06
+Cell-touches/particle/step: 1.1901
+Particle comm iterations/step: 1
+Particle fraction communicated: 0.000239775
+Particle fraction colliding with boundary: 0
+Particle fraction exiting boundary: 0.00280365
+Surface-checks/particle/step: 0.0274863
+Surface-collisions/particle/step: 0.000117668
+Surf-reactions/particle/step: 0
+Collision-attempts/particle/step: 0.0146727
+Collisions/particle/step: 0.0111829
+Reactions/particle/step: 0
+
+Move  time (%) = 2.92252 (46.4873)
+Coll  time (%) = 1.233 (19.6127)
+Sort  time (%) = 0.467449 (7.43552)
+Comm  time (%) = 0.371317 (5.90638)
+Modfy time (%) = 1.05026 (16.7061)
+Outpt time (%) = 0.241607 (3.84314)
+Other time (%) = 0.000556469 (0.00885152)
+
+Particles: 2.02873e+06 ave 2.02881e+06 max 2.02865e+06 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Cells:      204800 ave 204800 max 204800 min
+Histogram: 2 0 0 0 0 0 0 0 0 0
+GhostCell: 5120 ave 5120 max 5120 min
+Histogram: 2 0 0 0 0 0 0 0 0 0
+EmptyCell: 0 ave 0 max 0 min
+Histogram: 2 0 0 0 0 0 0 0 0 0
+collide_modify      vremax 100 no
+run 		    1000
+WARNING: One or more fix inflow faces oppose streaming velocity (../fix_emit_face.cpp:195)
+Memory usage per proc in Mbytes:
+  particles (ave,min,max) = 303.926 303.926 303.926
+  grid      (ave,min,max) = 37.104 37.104 37.104
+  surf      (ave,min,max) = 0.0801544 0.0801544 0.0801544
+  total     (ave,min,max) = 342.673 342.673 342.673
+Step CPU Np Natt Ncoll Nscoll c_max 
+    1000            0  4057463     2054     1791        0          105 
+    1100   0.62377119  4056022     2114     1810      481          105 
+    1200    1.2465692  4055858     2058     1824      448          100 
+    1300    1.8703592  4056938     2085     1790      456          100 
+    1400    2.4920101  4056575     2035     1767      506          105 
+    1500    3.1141081  4057725     2103     1844      459           96 
+    1600    3.7357461  4056541     2068     1803      506          102 
+    1700    4.3600531  4056415     2077     1811      457          100 
+    1800    4.9817591  4055181     2044     1759      476          106 
+    1900    5.6024261  4055606     2047     1782      479           96 
+    2000     6.224138  4055701     2100     1815      461           95 
+Loop time of 6.22419 on 2 procs for 1000 steps with 4055701 particles
+
+Particle moves    = 4067691420 (4.07B)
+Cells touched     = 4843777524 (4.84B)
+Particle comms    = 1042818 (1.04M)
+Boundary collides = 0 (0K)
+Boundary exits    = 11391450 (11.4M)
+SurfColl checks   = 116567171 (117M)
+SurfColl occurs   = 485546 (0.486M)
+Surf reactions    = 0 (0K)
+Collide attempts  = 62065228 (62.1M)
+Collide occurs    = 47313580 (47.3M)
+Reactions         = 0 (0K)
+Particles stuck   = 0
+
+Particle-moves/CPUsec/proc: 3.26765e+08
+Particle-moves/step: 4.06769e+06
+Cell-touches/particle/step: 1.19079
+Particle comm iterations/step: 1
+Particle fraction communicated: 0.000256366
+Particle fraction colliding with boundary: 0
+Particle fraction exiting boundary: 0.00280047
+Surface-checks/particle/step: 0.0286568
+Surface-collisions/particle/step: 0.000119366
+Surf-reactions/particle/step: 0
+Collision-attempts/particle/step: 0.0152581
+Collisions/particle/step: 0.0116316
+Reactions/particle/step: 0
+
+Move  time (%) = 2.94275 (47.2792)
+Coll  time (%) = 1.24865 (20.0612)
+Sort  time (%) = 0.432791 (6.95337)
+Comm  time (%) = 0.333429 (5.35698)
+Modfy time (%) = 1.03551 (16.6369)
+Outpt time (%) = 0.230519 (3.7036)
+Other time (%) = 0.000540853 (0.00868953)
+
+Particles: 2.02785e+06 ave 2.02831e+06 max 2.02739e+06 min
+Histogram: 1 0 0 0 0 0 0 0 0 1
+Cells:      204800 ave 204800 max 204800 min
+Histogram: 2 0 0 0 0 0 0 0 0 0
+GhostCell: 5120 ave 5120 max 5120 min
+Histogram: 2 0 0 0 0 0 0 0 0 0
+EmptyCell: 0 ave 0 max 0 min
+Histogram: 2 0 0 0 0 0 0 0 0 0

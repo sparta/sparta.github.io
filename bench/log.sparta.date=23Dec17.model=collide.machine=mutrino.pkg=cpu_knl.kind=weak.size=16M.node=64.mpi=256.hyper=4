@@ -1,0 +1,179 @@
+SPARTA (23 Dec 2017)
+# advect particles via VSS collisional flow on a uniform grid
+# particles reflect off global box boundaries
+
+variable            x index 10
+variable            y index 10
+variable            z index 10
+
+variable            lx equal $x*1.0e-5
+variable            lx equal 512*1.0e-5
+variable            ly equal $y*1.0e-5
+variable            ly equal 320*1.0e-5
+variable            lz equal $z*1.0e-5
+variable            lz equal 640*1.0e-5
+
+variable            n equal 10*$x*$y*$z
+variable            n equal 10*512*$y*$z
+variable            n equal 10*512*320*$z
+variable            n equal 10*512*320*640
+
+seed	    	    12345
+dimension   	    3
+global              gridcut 1.0e-5
+
+boundary	    rr rr rr
+
+create_box  	    0 ${lx} 0 ${ly} 0 ${lz}
+create_box  	    0 0.00512 0 ${ly} 0 ${lz}
+create_box  	    0 0.00512 0 0.0032 0 ${lz}
+create_box  	    0 0.00512 0 0.0032 0 0.0064
+Created orthogonal box = (0 0 0) to (0.00512 0.0032 0.0064)
+create_grid 	    $x $y $z
+create_grid 	    512 $y $z
+create_grid 	    512 320 $z
+create_grid 	    512 320 640
+WARNING: Could not acquire nearby ghost cells b/c grid partition is not clumped (../grid.cpp:381)
+Created 104857600 child grid cells
+  parent cells = 1
+  CPU time = 0.166292 secs
+  create/ghost percent = 29.8554 70.1446
+
+balance_grid        rcb part
+Balance grid migrated 104844800 cells
+  CPU time = 8.31058 secs
+  reassign/sort/migrate/ghost percent = 81.7812 0.0154029 12.909 5.29438
+
+species		    ar.species Ar
+mixture		    air Ar vstream 0.0 0.0 0.0 temp 273.15
+
+global              nrho 7.07043E22
+global              fnum 7.07043E6
+
+collide		    vss air ar.vss
+
+create_particles    air n $n
+create_particles    air n 1048576000
+Created 1048576000 particles
+  CPU time = 0.165137 secs
+
+stats		    100
+compute             temp temp
+stats_style	    step cpu np nattempt ncoll c_temp
+
+# first equilibrate with large timestep to unsort particles
+# then benchmark with normal timestep
+
+timestep 	    7.00E-8
+run                 30
+Memory usage per proc in Mbytes:
+  particles (ave,min,max) = 6.75 6.75 6.75
+  grid      (ave,min,max) = 2.45109 1.51388 2.45138
+  surf      (ave,min,max) = 0 0 0
+  total     (ave,min,max) = 9.20109 8.26388 9.20138
+Step CPU Np Natt Ncoll c_temp 
+       0            0 1048576000        0        0    273.15092 
+      30    8.7737041 1048576000 1051959347 740475002    273.15092 
+Loop time of 8.77587 on 16384 procs for 30 steps with 1048576000 particles
+
+Particle moves    = 31457280000 (31.5B)
+Cells touched     = 157415254170 (157B)
+Particle comms    = 6187894637 (6.19B)
+Boundary collides = 278260070 (278M)
+Boundary exits    = 0 (0K)
+SurfColl checks   = 0 (0K)
+SurfColl occurs   = 0 (0K)
+Surf reactions    = 0 (0K)
+Collide attempts  = 30459134508 (30.5B)
+Collide occurs    = 22114470671 (22.1B)
+Reactions         = 0 (0K)
+Particles stuck   = 0
+
+Particle-moves/CPUsec/proc: 218782
+Particle-moves/step: 1.04858e+09
+Cell-touches/particle/step: 5.0041
+Particle comm iterations/step: 4
+Particle fraction communicated: 0.196708
+Particle fraction colliding with boundary: 0.00884565
+Particle fraction exiting boundary: 0
+Surface-checks/particle/step: 0
+Surface-collisions/particle/step: 0
+Surf-reactions/particle/step: 0
+Collision-attempts/particle/step: 0.96827
+Collisions/particle/step: 0.703
+Reactions/particle/step: 0
+
+Move  time (%) = 4.56021 (51.9631)
+Coll  time (%) = 2.63859 (30.0665)
+Sort  time (%) = 0.263974 (3.00795)
+Comm  time (%) = 1.28569 (14.6503)
+Modfy time (%) = 0 (0)
+Outpt time (%) = 0.026882 (0.306318)
+Other time (%) = 0.000517298 (0.00589455)
+
+Particles: 64000 ave 64998 max 62994 min
+Histogram: 11 122 745 2537 4625 4778 2627 799 127 13
+Cells:      6400 ave 6400 max 6400 min
+Histogram: 16384 0 0 0 0 0 0 0 0 0
+GhostCell: 4440.61 ave 5120 max 1538 min
+Histogram: 5 16 109 319 786 1709 1436 1868 4832 5304
+EmptyCell: 1876.37 ave 2808 max 0 min
+Histogram: 54 348 411 977 1731 1995 3870 1383 4005 1610
+timestep 	    7.00E-9
+run 		    $t
+run 		    100
+Memory usage per proc in Mbytes:
+  particles (ave,min,max) = 6.75 6.75 6.75
+  grid      (ave,min,max) = 2.45109 1.51388 2.45138
+  surf      (ave,min,max) = 0 0 0
+  total     (ave,min,max) = 9.20109 8.26388 9.20138
+Step CPU Np Natt Ncoll c_temp 
+      30            0 1048576000 1051959347 740475002    273.15092 
+     100     5.001209 1048576000 100630093 74055029    273.15092 
+     130    7.1116168 1048576000 101979144 74070882    273.15092 
+Loop time of 7.11371 on 16384 procs for 100 steps with 1048576000 particles
+
+Particle moves    = 104857600000 (105B)
+Cells touched     = 146667215964 (147B)
+Particle comms    = 2162041861 (2.16B)
+Boundary collides = 92739464 (92.7M)
+Boundary exits    = 0 (0K)
+SurfColl checks   = 0 (0K)
+SurfColl occurs   = 0 (0K)
+Surf reactions    = 0 (0K)
+Collide attempts  = 9824009513 (9.82B)
+Collide occurs    = 7358662884 (7.36B)
+Reactions         = 0 (0K)
+Particles stuck   = 0
+
+Particle-moves/CPUsec/proc: 899671
+Particle-moves/step: 1.04858e+09
+Cell-touches/particle/step: 1.39873
+Particle comm iterations/step: 1
+Particle fraction communicated: 0.0206188
+Particle fraction colliding with boundary: 0.000884432
+Particle fraction exiting boundary: 0
+Surface-checks/particle/step: 0
+Surface-collisions/particle/step: 0
+Surf-reactions/particle/step: 0
+Collision-attempts/particle/step: 0.0936891
+Collisions/particle/step: 0.0701777
+Reactions/particle/step: 0
+
+Move  time (%) = 3.86633 (54.3503)
+Coll  time (%) = 1.76867 (24.8629)
+Sort  time (%) = 0.885455 (12.4472)
+Comm  time (%) = 0.576902 (8.10972)
+Modfy time (%) = 0 (0)
+Outpt time (%) = 0.0157654 (0.221619)
+Other time (%) = 0.000591598 (0.0083163)
+
+Particles: 64000 ave 64971 max 63036 min
+Histogram: 24 145 856 2615 4687 4526 2549 820 144 18
+Cells:      6400 ave 6400 max 6400 min
+Histogram: 16384 0 0 0 0 0 0 0 0 0
+GhostCell: 4440.61 ave 5120 max 1538 min
+Histogram: 5 16 109 319 786 1709 1436 1868 4832 5304
+EmptyCell: 1876.37 ave 2808 max 0 min
+Histogram: 54 348 411 977 1731 1995 3870 1383 4005 1610
+

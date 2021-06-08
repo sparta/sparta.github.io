@@ -1,0 +1,184 @@
+SPARTA (23 Dec 2017)
+KOKKOS mode is enabled (../kokkos.cpp:39)
+  using 0 GPU(s) per MPI task
+  using 2 thread(s) per MPI task
+package kokkos
+package kokkos reduction parallel/reduce comm classic
+# advect particles via VSS collisional flow on a uniform grid
+# particles reflect off global box boundaries
+
+variable            x index 10
+variable            y index 10
+variable            z index 10
+
+variable            lx equal $x*1.0e-5
+variable            lx equal 256*1.0e-5
+variable            ly equal $y*1.0e-5
+variable            ly equal 160*1.0e-5
+variable            lz equal $z*1.0e-5
+variable            lz equal 160*1.0e-5
+
+variable            n equal 10*$x*$y*$z
+variable            n equal 10*256*$y*$z
+variable            n equal 10*256*160*$z
+variable            n equal 10*256*160*160
+
+seed	    	    12345
+dimension   	    3
+global              gridcut 1.0e-5
+
+boundary	    rr rr rr
+
+create_box  	    0 ${lx} 0 ${ly} 0 ${lz}
+create_box  	    0 0.00256 0 ${ly} 0 ${lz}
+create_box  	    0 0.00256 0 0.0016 0 ${lz}
+create_box  	    0 0.00256 0 0.0016 0 0.0016
+Created orthogonal box = (0 0 0) to (0.00256 0.0016 0.0016)
+create_grid 	    $x $y $z
+create_grid 	    256 $y $z
+create_grid 	    256 160 $z
+create_grid 	    256 160 160
+WARNING: Could not acquire nearby ghost cells b/c grid partition is not clumped (../grid.cpp:381)
+Created 6553600 child grid cells
+  parent cells = 1
+  CPU time = 0.02983 secs
+  create/ghost percent = 40.9724 59.0276
+
+balance_grid        rcb part
+Balance grid migrated 6550400 cells
+  CPU time = 0.208512 secs
+  reassign/sort/migrate/ghost percent = 67.4503 0.0662045 16.4351 16.0485
+
+species		    ar.species Ar
+mixture		    air Ar vstream 0.0 0.0 0.0 temp 273.15
+
+global              nrho 7.07043E22
+global              fnum 7.07043E6
+
+collide		    vss air ar.vss
+
+create_particles    air n $n
+create_particles    air n 65536000
+Created 65536000 particles
+  CPU time = 0.050606 secs
+
+stats		    100
+compute             temp temp
+stats_style	    step cpu np nattempt ncoll c_temp
+
+# first equilibrate with large timestep to unsort particles
+# then benchmark with normal timestep
+
+timestep 	    7.00E-8
+run                 30
+Memory usage per proc in Mbytes:
+  particles (ave,min,max) = 3.54371 3.54371 3.54371
+  grid      (ave,min,max) = 1.51388 1.51388 1.51388
+  surf      (ave,min,max) = 0 0 0
+  total     (ave,min,max) = 5.05759 5.05759 5.05759
+Step CPU Np Natt Ncoll c_temp 
+       0            0 65536000        0        0     273.1798 
+      30   0.54038596 65536000 65747615 46283003     273.1798 
+Loop time of 0.540487 on 2048 procs for 30 steps with 65536000 particles
+
+Particle moves    = 1966080000 (1.97B)
+Cells touched     = 9819143758 (9.82B)
+Particle comms    = 481177165 (481M)
+Boundary collides = 42957731 (43M)
+Boundary exits    = 0 (0K)
+SurfColl checks   = 0 (0K)
+SurfColl occurs   = 0 (0K)
+Surf reactions    = 0 (0K)
+Collide attempts  = 1903736866 (1.9B)
+Collide occurs    = 1382185904 (1.38B)
+Reactions         = 0 (0K)
+Particles stuck   = 0
+
+Particle-moves/CPUsec/proc: 1.77618e+06
+Particle-moves/step: 6.5536e+07
+Cell-touches/particle/step: 4.99427
+Particle comm iterations/step: 3.86667
+Particle fraction communicated: 0.244739
+Particle fraction colliding with boundary: 0.0218494
+Particle fraction exiting boundary: 0
+Surface-checks/particle/step: 0
+Surface-collisions/particle/step: 0
+Surf-reactions/particle/step: 0
+Collision-attempts/particle/step: 0.968291
+Collisions/particle/step: 0.703016
+Reactions/particle/step: 0
+
+Move  time (%) = 0.204158 (37.7731)
+Coll  time (%) = 0.12079 (22.3484)
+Sort  time (%) = 0.0452289 (8.36818)
+Comm  time (%) = 0.169211 (31.3071)
+Modfy time (%) = 0 (0)
+Outpt time (%) = 0.000981898 (0.181669)
+Other time (%) = 0.000116248 (0.021508)
+
+Particles: 32000 ave 32592 max 31396 min
+Histogram: 7 38 128 327 501 499 355 146 36 11
+Cells:      3200 ave 3200 max 3200 min
+Histogram: 2048 0 0 0 0 0 0 0 0 0
+GhostCell: 2958.76 ave 3520 max 1336 min
+Histogram: 14 10 62 92 140 246 252 490 56 686
+EmptyCell: 1210.31 ave 1968 max 252 min
+Histogram: 36 96 152 278 292 278 376 226 158 156
+timestep 	    7.00E-9
+run 		    $t
+run 		    100
+Memory usage per proc in Mbytes:
+  particles (ave,min,max) = 3.54371 3.54371 3.54371
+  grid      (ave,min,max) = 1.51388 1.51388 1.51388
+  surf      (ave,min,max) = 0 0 0
+  total     (ave,min,max) = 5.05759 5.05759 5.05759
+Step CPU Np Natt Ncoll c_temp 
+      30            0 65536000 65747615 46283003     273.1798 
+     100   0.32294488 65536000  6287929  4627167     273.1798 
+     130   0.46463895 65536000  6372560  4626972     273.1798 
+Loop time of 0.464754 on 2048 procs for 100 steps with 65536000 particles
+
+Particle moves    = 6553600000 (6.55B)
+Cells touched     = 9158334016 (9.16B)
+Particle comms    = 169804826 (170M)
+Boundary collides = 14319688 (14.3M)
+Boundary exits    = 0 (0K)
+SurfColl checks   = 0 (0K)
+SurfColl occurs   = 0 (0K)
+Surf reactions    = 0 (0K)
+Collide attempts  = 614009467 (614M)
+Collide occurs    = 459908557 (460M)
+Reactions         = 0 (0K)
+Particles stuck   = 0
+
+Particle-moves/CPUsec/proc: 6.88536e+06
+Particle-moves/step: 6.5536e+07
+Cell-touches/particle/step: 1.39745
+Particle comm iterations/step: 1.01
+Particle fraction communicated: 0.0259102
+Particle fraction colliding with boundary: 0.00218501
+Particle fraction exiting boundary: 0
+Surface-checks/particle/step: 0
+Surface-collisions/particle/step: 0
+Surf-reactions/particle/step: 0
+Collision-attempts/particle/step: 0.0936904
+Collisions/particle/step: 0.0701765
+Reactions/particle/step: 0
+
+Move  time (%) = 0.207607 (44.6704)
+Coll  time (%) = 0.0600428 (12.9193)
+Sort  time (%) = 0.136526 (29.376)
+Comm  time (%) = 0.0578708 (12.4519)
+Modfy time (%) = 0 (0)
+Outpt time (%) = 0.00246876 (0.531197)
+Other time (%) = 0.000237949 (0.0511989)
+
+Particles: 32000 ave 32532 max 31460 min
+Histogram: 12 49 160 322 461 490 309 175 51 19
+Cells:      3200 ave 3200 max 3200 min
+Histogram: 2048 0 0 0 0 0 0 0 0 0
+GhostCell: 2958.76 ave 3520 max 1336 min
+Histogram: 14 10 62 92 140 246 252 490 56 686
+EmptyCell: 1210.31 ave 1968 max 252 min
+Histogram: 36 96 152 278 292 278 376 226 158 156
+
