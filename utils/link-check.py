@@ -98,7 +98,13 @@ def main():
             if href in allowed or (target and target in allowed):
                 known += 1
                 continue
-            if target and not (page.parent / target).exists():
+            # The site is served from the root of sparta.github.io, so a
+            # site-absolute link ("/doc/Manual.html", as the 404 page has to
+            # use) resolves against the top of the tree, not the page.
+            base = page.parent
+            if target.startswith('/'):
+                base, target = root, target.lstrip('/')
+            if target and not (base / target).exists():
                 # The manual is a separate project, copied in under doc/ at
                 # release time, so it is legitimately absent from a build of
                 # the site alone.  Only doc/, and only when it is not there.
@@ -110,7 +116,7 @@ def main():
             # the anchor is looked for in the file the link actually reaches
             dest = name
             if target:
-                resolved = (page.parent / target).resolve()
+                resolved = (base / target).resolve()
                 try:
                     dest = resolved.relative_to(root.resolve()).as_posix()
                 except ValueError:      # a link that climbs out of the tree
