@@ -1,0 +1,122 @@
+# Build and publish sparta.github.io.
+#
+# The site is deployed as a GitHub Pages artifact, so nothing generated --
+# the site's pages, the manual's HTML, its PDF -- is ever committed to this
+# repository.  Each run builds:
+#
+#   - the site's own pages, from src/ (make html), which also copies the
+#     images, movies, inputs, patches, pdf and bench folders in;
+#   - the SPARTA manual, HTML and PDF, from the master branch of
+#     sparta/sparta, placed under doc/.
+#
+# It runs when the site changes, once a day so the manual follows SPARTA's
+# master branch, and on demand.  To use it, set Settings -> Pages ->
+# Source to "GitHub Actions".
+#
+# If the PDF cannot be built, the run still publishes, with the PDF of the
+# latest release (doc/Manual.pdf in this repository) in its place, and says
+# so in the run summary.
+
+name: publish
+
+on:
+  push:
+    branches: [master]
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+    inputs:
+      manual_repository:
+        description: 'SPARTA repository to build the manual from'
+        default: 'sparta/sparta'
+      manual_ref:
+        description: 'Branch, tag or commit of that repository'
+        default: 'master'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# one deployment at a time; a newer run wins
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      MANUAL_REPO: ${{ github.event.inputs.manual_repository || 'sparta/sparta' }}
+      MANUAL_REF: ${{ github.event.inputs.manual_ref || 'master' }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Build the site
+      run: make html SPHINXEXTRA="-W --keep-going"
+
+    - uses: actions/checkout@v4
+      with:
+        repository: ${{ env.MANUAL_REPO }}
+        ref: ${{ env.MANUAL_REF }}
+        path: sparta
+
+    - name: Build the manual
+      run: make -C sparta/doc html SPHINXEXTRA="-W --keep-going"
+
+    - name: Check the manual's links
+      run: python3 sparta/doc/utils/link-check.py sparta/doc/html
+
+    - name: Install LaTeX for the PDF
+      run: |
+        sudo apt-get update -q
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
+          --no-install-recommends latexmk texlive-latex-recommended \
+          texlive-latex-extra texlive-fonts-recommended tex-gyre
+
+    # writes sparta/doc/html/Manual.pdf
+    - name: Build the PDF
+      id: pdf
+      continue-on-error: true
+      run: make -C sparta/doc pdf
+
+    - name: Use the latest release's PDF instead
+      if: steps.pdf.outcome != 'success'
+      run: |
+        cp doc/Manual.pdf sparta/doc/html/Manual.pdf
+        echo "::warning::The PDF did not build; publishing the latest release's doc/Manual.pdf instead."
+        echo "**PDF:** did not build; the latest release's doc/Manual.pdf is published instead." >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Put the manual under doc/
+      run: |
+        rm -rf html/doc
+        cp -a sparta/doc/html html/doc
+
+    - name: Check every link on the site, into the manual too
+      run: python3 utils/link-check.py html
+
+    - name: Record what was built
+      run: |
+        {
+          echo "**Site:** $(git rev-parse --short HEAD)"
+          echo "**Manual:** $MANUAL_REPO@$MANUAL_REF ($(git -C sparta rev-parse --short HEAD))"
+          echo "**PDF:** ${{ steps.pdf.outcome == 'success' && 'built from the manual' || 'latest release (fallback)' }}"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - uses: actions/upload-pages-artifact@v3
+      with:
+        path: html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+    - id: deployment
+      uses: actions/deploy-pages@v4
