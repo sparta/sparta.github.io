@@ -71,8 +71,27 @@ jobs:
     - name: Check the manual's links
       run: python3 sparta/doc/utils/link-check.py sparta/doc/html
 
+    # LaTeX is about 100 MB of packages, and the Ubuntu mirror is slow, so
+    # the downloaded .deb files are cached between runs, as SPARTA's own CI
+    # caches its packages.  The key names the packages: changing the list
+    # starts a fresh cache.
+    - name: Prepare the apt cache
+      run: sudo chmod -R a+rwx /var/cache/apt/archives
+
+    - name: Cache the LaTeX packages
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt/archives
+        key: apt-latex-ubuntu-24.04-latexmk-latex-recommended-latex-extra-fonts-recommended-tex-gyre
+
     - name: Install LaTeX for the PDF
       run: |
+        # keep the downloaded packages, so the cache step can save them
+        echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
+          | sudo tee /etc/apt/apt.conf.d/99keep-debs
+        # skip rebuilding the man-page index after installing, which is
+        # slow on these runners and nothing here reads man pages
+        sudo rm -f /var/lib/man-db/auto-update
         sudo apt-get update -q
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
           --no-install-recommends latexmk texlive-latex-recommended \
